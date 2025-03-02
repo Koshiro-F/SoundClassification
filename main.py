@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import numpy as np
 import tensorflow as tf
 from typing import List
-import time
+import os
+import uvicorn
 
 # # TensorFlow Liteモデルの読み込みと準備
 # MODEL_PATH = "./model/a-nn-ikami-mikubo-fujikawa-model-xy-ver2.tflite"
@@ -27,6 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 class SpectrumData(BaseModel):
     sampleRate: int
@@ -62,6 +66,23 @@ async def classify_fft(data: SpectrumData):
     # 例: 返却データをJSON形式で返す（クラスインデックスを返却）
     return {"predicted_class": 1}
 
+
+
+@app.post("/upload")
+async def upload(image: UploadFile = File(...)):
+    # ファイル名が空でないかチェック
+    if not image.filename:
+        raise HTTPException(status_code=400, detail="ファイルが選択されていません")
+    
+    # ファイルの保存先を指定
+    save_path = os.path.join(UPLOAD_FOLDER, image.filename)
+    
+    # ファイルを保存
+    content = await image.read()
+    with open(save_path, "wb") as f:
+        f.write(content)
+    
+    return JSONResponse(content={"message": "ファイルが正常にアップロードされました"}, status_code=200)
+
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
